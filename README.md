@@ -15,6 +15,11 @@ Based on the following documentation and code:
 - [Go](https://golang.org/doc/install)
   - [Terratest](https://terratest.gruntwork.io/docs/getting-started/quick-start/)
 
+## Terraform
+The [provider is configured to use LocalStack](./infra/provider.tf) by setting up the endpoint URLs to point to localhost and the port where LocalStack is running the service.
+
+Note that the `s3_force_path_style` parameter can be set to `true` if the S3 endpoint is set to `http://localhost:4566`. The documentation notes this may happen if there are DNS resolution issues when using `http://s3.localhost.localstack.cloud:4566` as the S3 endpoint.
+
 ## Localstack
 The [Docker Compose file](./docker-compose.yml) is configured to run LocalStack. The compose file can be included in your own project's compose file or used as a reference so that your app code can interact with LocalStack services.
 
