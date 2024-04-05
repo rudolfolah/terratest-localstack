@@ -6,3 +6,10 @@ Based on the following documentation and code:
   - [ldcorentin/aws-terratest-localstack](https://github.com/ldcorentin/aws-terratest-localstack)
 - [edsoncelio/terratest-localstack](https://github.com/edsoncelio/terratest-localstack)
 - [icarrera/terratest-localstack-example](https://github.com/icarrera/terratest-localstack-example)
+
+## Requirements
+- [Docker](https://docs.docker.com/get-docker/)
+- [Terraform](https://learn.hashicorp.com/tutorials/terraform/install-cli)
+- [LocalStack](https://docs.localstack.cloud/getting-started/installation/)
+- [Go](https://golang.org/doc/install)
+  - [Terratest](https://terratest.gruntwork.io/docs/getting-started/quick-start/)
