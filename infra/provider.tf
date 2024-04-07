@@ -1,5 +1,5 @@
 provider "aws" {
-  region = "ca-central-1"
+  region = var.region
   access_key = "test"
   secret_key = "test"
 
@@ -7,7 +7,7 @@ provider "aws" {
   skip_metadata_api_check = true
   skip_requesting_account_id = true
 
-  s3_force_path_style = false
+  s3_use_path_style = false
 
   endpoints {
     apigateway     = "http://localhost:4566"
@@ -26,7 +26,7 @@ provider "aws" {
     redshift       = "http://localhost:4566"
     route53        = "http://localhost:4566"
     s3             = "http://s3.localhost.localstack.cloud:4566"
-    # s3             = "http://localhost:4566" # this requires s3_force_path_style = true
+    # s3             = "http://localhost:4566" # this requires s3_use_path_style = true
     secretsmanager = "http://localhost:4566"
     ses            = "http://localhost:4566"
     sns            = "http://localhost:4566"
