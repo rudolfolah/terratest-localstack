@@ -20,5 +20,11 @@
 # Go workspace file
 go.work
 
+# Terraform runtime state and provider installs
+.terraform/
+
+# LocalStack runtime data
+volume/
+
 .idea
 .vscode

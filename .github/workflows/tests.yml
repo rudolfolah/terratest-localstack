@@ -1,0 +1,64 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  terratest:
+    name: Terratest
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: infra_tests/go.mod
+          cache-dependency-path: infra_tests/go.sum
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.0
+          terraform_wrapper: false
+
+      - name: Require LocalStack token
+        run: |
+          if [ -z "$LOCALSTACK_AUTH_TOKEN" ]; then
+            echo "LOCALSTACK_AUTH_TOKEN repository secret is required to run LocalStack tests." >&2
+            exit 1
+          fi
+
+      - name: Start LocalStack
+        run: |
+          docker compose up -d localstack
+          for attempt in {1..60}; do
+            if curl --fail --silent http://localhost:4566/_localstack/health >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose logs localstack
+          exit 1
+
+      - name: Run Go tests
+        working-directory: infra_tests
+        run: go test -v -timeout 30m
+
+      - name: Stop LocalStack
+        if: always()
+        run: docker compose down --volumes

@@ -11,7 +11,8 @@ Based on the following documentation and code:
 - [Docker](https://docs.docker.com/get-docker/)
 - [Terraform](https://learn.hashicorp.com/tutorials/terraform/install-cli)
 - [LocalStack](https://docs.localstack.cloud/getting-started/installation/)
-  - [LocalStack configuration for Terraform](https://docs.localstack.cloud/user-guide/integrations/terraform/) 
+  - [LocalStack configuration for Terraform](https://docs.localstack.cloud/user-guide/integrations/terraform/)
+  - `LOCALSTACK_AUTH_TOKEN` is required by current LocalStack Docker images, including the free Hobby tier.
 - [Go](https://golang.org/doc/install)
   - [Terratest](https://terratest.gruntwork.io/docs/getting-started/quick-start/)
 
@@ -34,36 +35,27 @@ Terratest is able to use localstack for creating and destroying resources. The p
 
 However, Terratest's assertions use the AWS SDK to interact with resources.
 
-There are a few ways around this:
-1. using a fork of Terratest that allows global override of the AWS endpoints
-   - The base endpoint can be used to override the endpoint when creating a service client.
-   - The endpoint resolver can be used to override the endpoint for all service clients.
-   - In the go modules, the `replace` directive points to the fork
-2. creating a custom client for the resource and using that for assertions
-    - The custom client is created with the endpoint set to LocalStack
-    - This needs to be done for each resource that is being tested
-    - Terratest is used for setting up and tear down rather than for assertions
+There are two supported paths in the tests:
+1. Terratest AWS assertions use the AWS SDK for Go v2 endpoint environment variable:
+   - `AWS_ENDPOINT_URL_S3=http://s3.localhost.localstack.cloud:4566`
+   - static `test` credentials
+2. The custom S3 client test builds an AWS SDK for Go v2 client with `BaseEndpoint` set to the same LocalStack S3 endpoint.
 
-Both methods are demonstrated in the tests.
+The previous Terratest fork and Go module `replace` directive are no longer needed.
 
 # Running the tests
 
 ```shell
-# Create a network for localstack
-docker network create my-network
+# Required by current LocalStack images.
+export LOCALSTACK_AUTH_TOKEN=...
 
-# Start localstack (detached)
-docker run -d -it --name localstack_main -p 4566:4566 -p 4510-4559:4510-4559 --network my-network -e MAIN_DOCKER_NETWORK=my-network localstack/localstack
+# Start LocalStack.
+docker compose up -d localstack
 
-export AWS_ENDPOINT_URL=http://localhost:4567
-export AWS_ACCESS_KEY_ID=test
-export AWS_SECRET_ACCESS_KEY=test
+# Optional smoke check.
+curl http://localhost:4566/_localstack/health
 
-# Ensure it's running correctly, these should return the same result since they use the same endpoint url
-aws s3api list-buckets
-aws --endpoint-url http://localhost:4566 s3api list-buckets
-
-# Run the tests
-cd infra_test
+# Run the tests.
+cd infra_tests
 go test -v -timeout 30m
 ```
