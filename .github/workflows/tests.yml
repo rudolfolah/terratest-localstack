@@ -22,18 +22,18 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: infra_tests/go.mod
           cache-dependency-path: infra_tests/go.sum
 
       - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@v4
         with:
-          terraform_version: 1.14.0
+          terraform_version: 1.15.8
           terraform_wrapper: false
 
       - name: Require LocalStack token
