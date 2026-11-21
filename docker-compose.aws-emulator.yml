@@ -1,0 +1,21 @@
+services:
+  aws-emulator:
+    image: terratest-localstack/aws-emulator:v1.0.556
+    build:
+      context: docker/aws-emulator
+      args:
+        RPM_ARCH: ${EMULATOR_RPM_ARCH:?}
+    platform: linux/${EMULATOR_PLATFORM_ARCH:?}
+    user: "${EMULATOR_UID:?}:${EMULATOR_GID:?}"
+    environment:
+      HOME: "${HOME:?}"
+    ports: ["127.0.0.1:${EMULATOR_PORT:?}:${EMULATOR_PORT:?}"]
+    command: ["-p", "${EMULATOR_PORT:?}", "--telemetry", "off", "--idle-timeout", "1800"]
+    volumes:
+      - type: bind
+        source: "${HOME:?}/.aws/emulator"
+        target: "${HOME:?}/.aws/emulator"
+        bind:
+          create_host_path: false
+    mem_limit: 2g
+    memswap_limit: 2g

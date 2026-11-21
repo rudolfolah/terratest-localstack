@@ -1,0 +1,13 @@
+{
+  "localstack": {
+    "gateway": "http://localhost:4566",
+    "s3": "http://s3.localhost.localstack.cloud:4566",
+    "access_key": "test",
+    "secret_key": "test"
+  },
+  "aws-emulator": {
+    "endpoint_base": "https://127.0.0.1",
+    "port": 9297,
+    "region": "us-east-1"
+  }
+}

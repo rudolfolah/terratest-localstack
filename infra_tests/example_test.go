@@ -7,7 +7,6 @@ import (
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	terraaws "github.com/gruntwork-io/terratest/modules/aws"
@@ -16,13 +15,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const localStackS3Endpoint = "http://s3.localhost.localstack.cloud:4566"
-
 // Original source code: https://github.com/gruntwork-io/terratest/blob/master/test/terraform_aws_s3_example_test.go
 // An example of how to test the Terraform module in examples/terraform-aws-s3-example using Terratest.
 func TestTerraformAwsS3ExampleWithTerratestAWS(t *testing.T) {
 	ctx := t.Context()
-	configureLocalStackAWS(t)
+	backend := configureAWSBackend(t)
 
 	// Give this S3 Bucket a unique ID for a name tag so we can distinguish it from any other Buckets provisioned
 	// in your AWS account
@@ -31,23 +28,9 @@ func TestTerraformAwsS3ExampleWithTerratestAWS(t *testing.T) {
 	// Give this S3 Bucket an environment to operate as a part of for the purposes of resource tagging
 	expectedEnvironment := "Automated Testing"
 
-	// Pick a random AWS region to test in. This helps ensure your code works in all regions.
-	awsRegion := terraaws.GetRandomStableRegion(t, nil, nil)
+	awsRegion := backend.region
 
-	// Construct the terraform options with default retryable errors to handle the most common retryable errors in
-	// terraform testing.
-	terraformOptions := terraform.WithDefaultRetryableErrors(t, &terraform.Options{
-		// The path to where our Terraform code is located
-		TerraformDir: "../infra",
-
-		// Variables to pass to our Terraform code using -var options
-		Vars: map[string]interface{}{
-			"tag_bucket_name":        expectedName,
-			"tag_bucket_environment": expectedEnvironment,
-			"with_policy":            "true",
-			"region":                 awsRegion,
-		},
-	})
+	terraformOptions := backend.terraformOptions(t, expectedName, expectedEnvironment)
 
 	// At the end of the test, run `terraform destroy` to clean up any resources that were created
 	defer terraform.DestroyContext(t, ctx, terraformOptions)
@@ -78,33 +61,18 @@ func TestTerraformAwsS3ExampleWithTerratestAWS(t *testing.T) {
 
 func TestTerraformAwsS3ExampleWithCustomSession(t *testing.T) {
 	ctx := t.Context()
-	configureLocalStackAWS(t)
+	backend := configureAWSBackend(t)
 
 	expectedName := fmt.Sprintf("terratest-aws-s3-example-%s", strings.ToLower(random.UniqueId()))
 	expectedEnvironment := "Automated Testing"
 
-	awsRegion := terraaws.GetRandomStableRegion(t, nil, nil)
-
-	cfg, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion(awsRegion),
-		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider("test", "test", "")),
-	)
+	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(backend.region))
 	if err != nil {
 		t.Fatal(err)
 	}
-	s3Client := s3.NewFromConfig(cfg, func(options *s3.Options) {
-		options.BaseEndpoint = awssdk.String(localStackS3Endpoint)
-	})
+	s3Client := s3.NewFromConfig(cfg)
 
-	terraformOptions := terraform.WithDefaultRetryableErrors(t, &terraform.Options{
-		TerraformDir: "../infra",
-		Vars: map[string]interface{}{
-			"tag_bucket_name":        expectedName,
-			"tag_bucket_environment": expectedEnvironment,
-			"with_policy":            "true",
-			"region":                 awsRegion,
-		},
-	})
+	terraformOptions := backend.terraformOptions(t, expectedName, expectedEnvironment)
 
 	defer terraform.DestroyContext(t, ctx, terraformOptions)
 
@@ -151,13 +119,4 @@ func TestTerraformAwsS3ExampleWithCustomSession(t *testing.T) {
 		assert.Equal(t, expectedLogsTargetBucket, loggingTargetBucket)
 		assert.Equal(t, expectedLogsTargetPrefix, loggingObjectTargetPrefix)
 	}
-}
-
-func configureLocalStackAWS(t *testing.T) {
-	t.Helper()
-
-	t.Setenv("AWS_ACCESS_KEY_ID", "test")
-	t.Setenv("AWS_SECRET_ACCESS_KEY", "test")
-	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
-	t.Setenv("AWS_ENDPOINT_URL_S3", localStackS3Endpoint)
 }

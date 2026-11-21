@@ -20,6 +20,12 @@ variable "region" {
 # These parameters have reasonable defaults.
 # ---------------------------------------------------------------------------------------------------------------------
 
+variable "aws_emulator_endpoint" {
+  description = "Loopback AWS Emulator endpoint supplied by the integration tests."
+  type        = string
+  default     = null
+}
+
 variable "with_policy" {
   description = "If set to `true`, the bucket will be created with a bucket policy."
   type        = bool
