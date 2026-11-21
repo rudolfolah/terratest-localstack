@@ -1,5 +1,5 @@
 # terratest-localstack
-Run Terratest with LocalStack
+Run the same Terraform/S3 integration tests against LocalStack or AWS Emulator.
 
 Based on the following documentation and code:
 - ["Terraform (IaC) testing: Localstack + Terratest.", Corentin Le Devedec](https://medium.com/@ledevedeccorentin/terraform-iac-testing-localstack-terratest-9946dafe98b6)
@@ -7,55 +7,77 @@ Based on the following documentation and code:
 - [edsoncelio/terratest-localstack](https://github.com/edsoncelio/terratest-localstack)
 - [icarrera/terratest-localstack-example](https://github.com/icarrera/terratest-localstack-example)
 
-## Requirements
-- [Docker](https://docs.docker.com/get-docker/)
-- [Terraform](https://learn.hashicorp.com/tutorials/terraform/install-cli)
-- [LocalStack](https://docs.localstack.cloud/getting-started/installation/)
-  - [LocalStack configuration for Terraform](https://docs.localstack.cloud/user-guide/integrations/terraform/)
-  - `LOCALSTACK_AUTH_TOKEN` is required by current LocalStack Docker images, including the free Hobby tier.
-- [Go](https://golang.org/doc/install)
-  - [Terratest](https://terratest.gruntwork.io/docs/getting-started/quick-start/)
+## Integration tests
 
-## Terraform
-The [provider is configured to use LocalStack](./infra/provider.tf) by setting up the endpoint URLs to point to localhost and the port where LocalStack is running the service.
-
-Note that the `s3_use_path_style` parameter can be set to `true` if the S3 endpoint is set to `http://localhost:4566`. The documentation notes this may happen if there are DNS resolution issues when using `http://s3.localhost.localstack.cloud:4566` as the S3 endpoint.
+The [backend manifest](./infra/test-backends.json) supplies endpoint and emulator
+defaults, plus LocalStack's dummy credentials. The [runner](./scripts/test-infra.sh)
+selects the backend with `TEST_BACKEND`; unset or empty selects `localstack`.
+Both tests use the same [Terraform provider](./infra/provider.tf) and use Go's AWS
+SDK for their S3 assertions, one through Terratest and one directly.
 
 The infrastructure is based on the examples from terratest:
 - [terraform-aws-s3-example](https://github.com/gruntwork-io/terratest/tree/master/examples/terraform-aws-s3-example)
 - [terraform-aws-rds-example](https://github.com/gruntwork-io/terratest/tree/master/examples/terraform-aws-rds-example)
 
-## Localstack
-The [Docker Compose file](./docker-compose.yml) is configured to run LocalStack. The compose file can be included in your own project's compose file or used as a reference so that your app code can interact with LocalStack services.
+### LocalStack (default)
 
-LocalStack can be run as a Docker container.
+Install [Docker Compose](https://docs.docker.com/compose/install/),
+[Terraform](https://developer.hashicorp.com/terraform/install) and
+[Go](https://go.dev/doc/install). Current [LocalStack](https://docs.localstack.cloud/getting-started/installation/)
+images require `LOCALSTACK_AUTH_TOKEN`. The runner does not start or stop the
+service defined in [docker-compose.yml](./docker-compose.yml).
 
-## Terratest
-Terratest is able to use localstack for creating and destroying resources. The provider overrides that set the endpoints to point to Localstack are used there.
-
-However, Terratest's assertions use the AWS SDK to interact with resources.
-
-There are two supported paths in the tests:
-1. Terratest AWS assertions use the AWS SDK for Go v2 endpoint environment variable:
-   - `AWS_ENDPOINT_URL_S3=http://s3.localhost.localstack.cloud:4566`
-   - static `test` credentials
-2. The custom S3 client test builds an AWS SDK for Go v2 client with `BaseEndpoint` set to the same LocalStack S3 endpoint.
-
-The previous Terratest fork and Go module `replace` directive are no longer needed.
-
-# Running the tests
-
-```shell
-# Required by current LocalStack images.
+```sh
 export LOCALSTACK_AUTH_TOKEN=...
-
-# Start LocalStack.
 docker compose up -d localstack
-
-# Optional smoke check.
-curl http://localhost:4566/_localstack/health
-
-# Run the tests.
-cd infra_tests
-go test -v -timeout 30m
+TEST_BACKEND=localstack ./scripts/test-infra.sh
+# Or run directly: (cd infra_tests && go test -v -timeout 30m)
+docker compose down
 ```
+
+### AWS Emulator (opt-in)
+
+Install Go, Terraform, Docker Compose, [AWS CLI v2](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html),
+`jq`, and `curl`. No AWS or LocalStack credentials are needed.
+
+```sh
+TEST_BACKEND=aws-emulator ./scripts/test-infra.sh
+```
+
+The runner builds [AWS Emulator v1.0.556](https://github.com/aws/aws-emulator/releases/tag/v1.0.556),
+prints its live HTTPS health and signed STS caller identity, runs both tests, and
+tears down its Compose project. Set `AWS_EMULATOR_PORT` or `AWS_EMULATOR_REGION`
+to override the manifest. Use distinct ports for concurrent projects or regions:
+the host port, container port, and emulator listener port must match. Each run
+uses one account and one selected region.
+
+The emulator generates `config`, `emulator_credentials`, and `ca.pem` in
+`$HOME/.aws/emulator/<port>/`. The runner uses those files for authentication and
+TLS verification in that run only; it does not change global AWS configuration
+or trust. Each test gets a fresh Terraform working directory. No emulator resource
+state persists; this setup is not for production or load testing.
+
+### Backend gaps
+
+No suite-blocking gaps were observed on AWS Emulator v1.0.556. Both tests
+passed on macOS arm64 Docker Desktop with the emulator and with a fresh
+LocalStack project. The emulator passed signed STS `GetCallerIdentity`, S3
+versioning, policy presence and logging checks; Terraform apply and destroy
+completed for both tests on both backends. No fallback was needed.
+
+The [release scores](https://github.com/aws/aws-emulator/releases/download/v1.0.556/scores.json.gz)
+count units mentioning each service (including cross-service units), not this fixture:
+
+| Service | Pass | Fail | Skipped |
+| --- | ---: | ---: | ---: |
+| S3 | 2,483 | 488 | 17 |
+| STS | 222 | 65 | 7 |
+
+AWS Emulator's [virtual-hosted S3 gap](https://github.com/aws/aws-emulator/blob/v1.0.556/issues/things-that-do-not-work/20261029T083133Z-s3-virtual-hosted-style-bucket-addressing-is-unreachable.md)
+is why these tests use path style on its IP endpoint. Use LocalStack for
+virtual-host-specific tests. The upstream [S3 `GetBucketPolicy` 404 issue](https://github.com/aws/aws-emulator/blob/v1.0.556/issues/things-that-do-not-work/20261103T071133Z-s3-getbucketpolicy-answers-404-xml-for-a-bucket.md)
+uses a different policy fixture; it is not evidence of a failure here.
+
+These tests check policy presence, not enforcement. Use isolated real AWS for
+IAM and resource-policy enforcement tests, and use LocalStack only where it
+supports the compute or networking behavior under test; otherwise use real AWS.

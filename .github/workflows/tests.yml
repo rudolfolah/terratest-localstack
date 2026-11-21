@@ -45,9 +45,10 @@ jobs:
 
       - name: Start LocalStack
         run: |
+          health_base=$(jq -er '.localstack.gateway' infra/test-backends.json)
           docker compose up -d localstack
           for attempt in {1..60}; do
-            if curl --fail --silent http://localhost:4566/_localstack/health >/dev/null; then
+            if curl --fail --silent "$health_base/_localstack/health" >/dev/null; then
               exit 0
             fi
             sleep 2
@@ -56,9 +57,32 @@ jobs:
           exit 1
 
       - name: Run Go tests
-        working-directory: infra_tests
-        run: go test -v -timeout 30m
+        run: TEST_BACKEND=localstack ./scripts/test-infra.sh
 
       - name: Stop LocalStack
         if: always()
         run: docker compose down --volumes
+
+  terratest-aws-emulator:
+    name: Terratest (AWS Emulator)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: infra_tests/go.mod
+          cache-dependency-path: infra_tests/go.sum
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.15.8
+          terraform_wrapper: false
+
+      - name: Run Go tests
+        run: TEST_BACKEND=aws-emulator ./scripts/test-infra.sh

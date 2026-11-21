@@ -1,38 +1,42 @@
+locals {
+  localstack           = jsondecode(file("${path.module}/test-backends.json")).localstack
+  aws_gateway_endpoint = coalesce(var.aws_emulator_endpoint, local.localstack.gateway)
+}
+
 provider "aws" {
   region     = var.region
-  access_key = "test"
-  secret_key = "test"
+  access_key = var.aws_emulator_endpoint == null ? local.localstack.access_key : null
+  secret_key = var.aws_emulator_endpoint == null ? local.localstack.secret_key : null
 
   skip_credentials_validation = true
   skip_metadata_api_check     = true
   skip_requesting_account_id  = true
 
-  s3_use_path_style = false
+  s3_use_path_style = var.aws_emulator_endpoint != null
 
   endpoints {
-    apigateway     = "http://localhost:4566"
-    apigatewayv2   = "http://localhost:4566"
-    cloudformation = "http://localhost:4566"
-    cloudwatch     = "http://localhost:4566"
-    dynamodb       = "http://localhost:4566"
-    ec2            = "http://localhost:4566"
-    es             = "http://localhost:4566"
-    elasticache    = "http://localhost:4566"
-    firehose       = "http://localhost:4566"
-    iam            = "http://localhost:4566"
-    kinesis        = "http://localhost:4566"
-    lambda         = "http://localhost:4566"
-    rds            = "http://localhost:4566"
-    redshift       = "http://localhost:4566"
-    route53        = "http://localhost:4566"
-    s3             = "http://s3.localhost.localstack.cloud:4566"
-    # s3             = "http://localhost:4566" # this requires s3_use_path_style = true
-    secretsmanager = "http://localhost:4566"
-    ses            = "http://localhost:4566"
-    sns            = "http://localhost:4566"
-    sqs            = "http://localhost:4566"
-    ssm            = "http://localhost:4566"
-    stepfunctions  = "http://localhost:4566"
-    sts            = "http://localhost:4566"
+    apigateway     = local.aws_gateway_endpoint
+    apigatewayv2   = local.aws_gateway_endpoint
+    cloudformation = local.aws_gateway_endpoint
+    cloudwatch     = local.aws_gateway_endpoint
+    dynamodb       = local.aws_gateway_endpoint
+    ec2            = local.aws_gateway_endpoint
+    es             = local.aws_gateway_endpoint
+    elasticache    = local.aws_gateway_endpoint
+    firehose       = local.aws_gateway_endpoint
+    iam            = local.aws_gateway_endpoint
+    kinesis        = local.aws_gateway_endpoint
+    lambda         = local.aws_gateway_endpoint
+    rds            = local.aws_gateway_endpoint
+    redshift       = local.aws_gateway_endpoint
+    route53        = local.aws_gateway_endpoint
+    s3             = coalesce(var.aws_emulator_endpoint, local.localstack.s3)
+    secretsmanager = local.aws_gateway_endpoint
+    ses            = local.aws_gateway_endpoint
+    sns            = local.aws_gateway_endpoint
+    sqs            = local.aws_gateway_endpoint
+    ssm            = local.aws_gateway_endpoint
+    stepfunctions  = local.aws_gateway_endpoint
+    sts            = local.aws_gateway_endpoint
   }
 }
