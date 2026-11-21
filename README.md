@@ -37,6 +37,9 @@ docker compose down
 
 ### AWS Emulator (opt-in)
 
+See the [AWS Emulator repository](https://github.com/aws/aws-emulator) and the
+[official Docker guide](https://docs.aws.amazon.com/emulator/latest/userguide/getting-started-docker.html).
+
 Install Go, Terraform, Docker Compose, [AWS CLI v2](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html),
 `jq`, and `curl`. No AWS or LocalStack credentials are needed.
 
@@ -56,28 +59,3 @@ The emulator generates `config`, `emulator_credentials`, and `ca.pem` in
 TLS verification in that run only; it does not change global AWS configuration
 or trust. Each test gets a fresh Terraform working directory. No emulator resource
 state persists; this setup is not for production or load testing.
-
-### Backend gaps
-
-No suite-blocking gaps were observed on AWS Emulator v1.0.556. Both tests
-passed on macOS arm64 Docker Desktop with the emulator and with a fresh
-LocalStack project. The emulator passed signed STS `GetCallerIdentity`, S3
-versioning, policy presence and logging checks; Terraform apply and destroy
-completed for both tests on both backends. No fallback was needed.
-
-The [release scores](https://github.com/aws/aws-emulator/releases/download/v1.0.556/scores.json.gz)
-count units mentioning each service (including cross-service units), not this fixture:
-
-| Service | Pass | Fail | Skipped |
-| --- | ---: | ---: | ---: |
-| S3 | 2,483 | 488 | 17 |
-| STS | 222 | 65 | 7 |
-
-AWS Emulator's [virtual-hosted S3 gap](https://github.com/aws/aws-emulator/blob/v1.0.556/issues/things-that-do-not-work/20261029T083133Z-s3-virtual-hosted-style-bucket-addressing-is-unreachable.md)
-is why these tests use path style on its IP endpoint. Use LocalStack for
-virtual-host-specific tests. The upstream [S3 `GetBucketPolicy` 404 issue](https://github.com/aws/aws-emulator/blob/v1.0.556/issues/things-that-do-not-work/20261103T071133Z-s3-getbucketpolicy-answers-404-xml-for-a-bucket.md)
-uses a different policy fixture; it is not evidence of a failure here.
-
-These tests check policy presence, not enforcement. Use isolated real AWS for
-IAM and resource-policy enforcement tests, and use LocalStack only where it
-supports the compute or networking behavior under test; otherwise use real AWS.
